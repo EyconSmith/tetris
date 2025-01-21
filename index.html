@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esquivar Píxeles</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+        }
+
+        #gameOverModal,
+        #nameModal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #222;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            z-index: 1000;
+        }
+
+        #gameOverModal button,
+        #nameModal button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #gameOverModal button:hover,
+        #nameModal button:hover {
+            background-color: #666;
+        }
+
+        #nameInput {
+            padding: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        #topScores {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            width: 200px;
+        }
+
+        #topScores h2 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+
+        #topScores ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #topScores ul li {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Puntos: 0</div>
+    <canvas id="pixelGame"></canvas>
+
+    <!-- Modal de Game Over -->
+    <div id="gameOverModal">
+        <p>¡Perdiste!</p>
+        <button id="retryButton">Retry</button>
+    </div>
+
+    <!-- Modal para ingresar nombre -->
+    <div id="nameModal">
+        <p>Ingresa tu nombre:</p>
+        <input id="nameInput" type="text" placeholder="Tu nombre">
+        <button id="startButton">Iniciar</button>
+    </div>
+
+    <!-- Tabla de puntuaciones -->
+    <div id="topScores">
+        <h2>Top Jugadores</h2>
+        <ul id="scoresList"></ul>
+    </div>
+    <!-- El mismo código base anterior, con las modificaciones en JavaScript -->
+<script>
+    function saveScore() {
+        const storedScores = JSON.parse(localStorage.getItem("topScores")) || [];
+        const existingPlayer = storedScores.find((entry) => entry.name === playerName);
+
+        if (existingPlayer) {
+            // Si existe el jugador, actualiza el puntaje solo si supera su récord actual
+            if (score > existingPlayer.score) {
+                existingPlayer.score = score;
+            }
+        } else {
+            // Si no existe el jugador, agrega uno nuevo con su puntaje
+            storedScores.push({ name: playerName, score });
+        }
+
+        // Ordenar por puntuación y mantener solo el top 5
+        storedScores.sort((a, b) => b.score - a.score);
+        if (storedScores.length > 5) storedScores.length = 5;
+
+        // Guardar en localStorage
+        localStorage.setItem("topScores", JSON.stringify(storedScores));
+        displayTopScores();
+    }
+</script>
+
+
+    <script>
+        const canvas = document.getElementById("pixelGame");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const gameOverModal = document.getElementById("gameOverModal");
+        const retryButton = document.getElementById("retryButton");
+        const nameModal = document.getElementById("nameModal");
+        const nameInput = document.getElementById("nameInput");
+        const startButton = document.getElementById("startButton");
+        const topScoresList = document.getElementById("scoresList");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const pixelSize = 20;
+        const obstacleArea = {
+            x: canvas.width / 2 - 100,
+            width: 200
+        };
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - pixelSize,
+            width: pixelSize,
+            height: pixelSize,
+            color: "red",
+            speed: 15
+        };
+
+        const obstacles = [];
+        let gameRunning = false;
+        let playerName = "";
+        let score = 0;
+
+        function createObstacle() {
+            const x = Math.random() * (obstacleArea.width - pixelSize) + obstacleArea.x;
+            const speed = Math.random() * 2 + 2;
+            obstacles.push({ x, y: 0, width: pixelSize, height: pixelSize, speed, counted: false });
+        }
+
+        function movePlayer(event) {
+            if (!gameRunning) return;
+
+            if (event.key === "ArrowLeft" && player.x > obstacleArea.x) {
+                player.x -= player.speed;
+            } else if (event.key === "ArrowRight" && player.x < obstacleArea.x + obstacleArea.width - player.width) {
+                player.x += player.speed;
+            } else if (event.key === "ArrowUp" && player.y > 0) {
+                player.y -= player.speed;
+            } else if (event.key === "ArrowDown" && player.y < canvas.height - player.height) {
+                player.y += player.speed;
+            }
+        }
+
+        function updateObstacles() {
+            for (let obstacle of obstacles) {
+                obstacle.y += obstacle.speed;
+
+                if (!obstacle.counted && obstacle.y > player.y + player.height) {
+                    score++;
+                    obstacle.counted = true;
+                    scoreElement.textContent = `Puntos: ${score}`;
+                }
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                if (obstacles[i].y > canvas.height) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function detectCollision() {
+            for (let obstacle of obstacles) {
+                if (
+                    player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y
+                ) {
+                    gameRunning = false;
+                    saveScore();
+                    showGameOverModal();
+                }
+            }
+        }
+
+        function saveScore() {
+            const storedScores = JSON.parse(localStorage.getItem("topScores")) || [];
+            const existingPlayer = storedScores.find((entry) => entry.name === playerName);
+
+            if (!existingPlayer || score > existingPlayer.score) {
+                if (existingPlayer) {
+                    existingPlayer.score = score;
+                } else {
+                    storedScores.push({ name: playerName, score });
+                }
+
+                storedScores.sort((a, b) => b.score - a.score);
+                if (storedScores.length > 5) storedScores.length = 5;
+                localStorage.setItem("topScores", JSON.stringify(storedScores));
+            }
+
+            displayTopScores();
+        }
+
+        function displayTopScores() {
+            const storedScores = JSON.parse(localStorage.getItem("topScores")) || [];
+            topScoresList.innerHTML = storedScores
+                .filter((entry) => entry.name && entry.score !== undefined)
+                .map((entry, i) => `<li>${i + 1}. ${entry.name} - ${entry.score} puntos</li>`)
+                .join("");
+        }
+
+        function showGameOverModal() {
+            gameOverModal.style.display = "block";
+        }
+
+        function hideGameOverModal() {
+            gameOverModal.style.display = "none";
+        }
+
+        function restartGame() {
+            gameRunning = true;
+            score = 0;
+            obstacles.length = 0;
+            player.x = canvas.width / 2;
+            player.y = canvas.height - pixelSize;
+            scoreElement.textContent = "Puntos: 0";
+            hideGameOverModal();
+            gameLoop();
+        }
+
+        function startGame() {
+            const inputName = nameInput.value.trim();
+            if (!inputName) {
+                alert("Por favor, ingresa tu nombre.");
+                return;
+            }
+
+            playerName = inputName;
+            nameModal.style.display = "none";
+            gameRunning = true;
+            gameLoop();
+        }
+
+        retryButton.addEventListener("click", restartGame);
+        startButton.addEventListener("click", startGame);
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function drawObstacles() {
+            ctx.fillStyle = "white";
+            for (let obstacle of obstacles) {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            }
+        }
+
+        function drawObstacleArea() {
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(obstacleArea.x, 0, obstacleArea.width, canvas.height);
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawObstacleArea();
+            drawPlayer();
+            drawObstacles();
+
+            updateObstacles();
+            detectCollision();
+
+            if (Math.random() < 0.02) createObstacle();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener("keydown", movePlayer);
+        displayTopScores();
+
+        // Mostrar modal para ingresar nombre al cargar la página
+        nameModal.style.display = "block";
+    </script>
+</body>
+</html>
