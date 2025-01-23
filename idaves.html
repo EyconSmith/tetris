@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evades.io Clone with Levels</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      font-size: 20px;
+      z-index: 1;
+    }
+
+    #level {
+      position: absolute;
+      top: 40px;
+      left: 10px;
+      color: #fff;
+      font-size: 20px;
+      z-index: 1;
+    }
+
+    #timer {
+      position: absolute;
+      top: 70px;
+      left: 10px;
+      color: #fff;
+      font-size: 20px;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <div id="level">Level: 1</div>
+  <div id="timer">Time Left: 30</div>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const player = {
+      x: canvas.width / 2,
+      y: canvas.height - 50,
+      size: 20,
+      color: 'red',
+      speed: 5
+    };
+
+    let obstacles = [];
+    let bouncingBlocks = [];
+    let score = 0;
+    let level = 1;
+    let gameRunning = true;
+    let levelDuration = 500; // Duration of each level in frames
+    let frameCount = 0;
+    let timeLeft = 30; // Time left for the level in seconds
+
+    function createObstacle() {
+      const size = Math.random() * 30 + 20;
+      obstacles.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        size: size,
+        speed: Math.random() * 3 + 2
+      });
+    }
+
+    function createBouncingBlock() {
+      const size = 30;
+      bouncingBlocks.push({
+        x: Math.random() * (canvas.width - size),
+        y: Math.random() * (canvas.height - size),
+        size: size,
+        dx: Math.random() < 0.5 ? 1 : -1, // Random direction
+        dy: Math.random() < 0.5 ? 1 : -1,
+        speed: 2
+      });
+    }
+
+    function updateObstacles() {
+      for (let i = 0; i < obstacles.length; i++) {
+        obstacles[i].y += obstacles[i].speed;
+
+        // Remove obstacles that go off-screen
+        if (obstacles[i].y > canvas.height) {
+          obstacles.splice(i, 1);
+          score++;
+        }
+      }
+
+      // Add new obstacles periodically
+      if (Math.random() < 0.02) {
+        createObstacle();
+      }
+    }
+
+    function updateBouncingBlocks() {
+      for (const block of bouncingBlocks) {
+        block.x += block.dx * block.speed;
+        block.y += block.dy * block.speed;
+
+        // Bounce off walls
+        if (block.x <= 0 || block.x + block.size >= canvas.width) {
+          block.dx *= -1;
+        }
+        if (block.y <= 0 || block.y + block.size >= canvas.height) {
+          block.dy *= -1;
+        }
+      }
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+    }
+
+    function drawObstacles() {
+      ctx.fillStyle = 'white';
+      for (const obstacle of obstacles) {
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.size, obstacle.size);
+      }
+    }
+
+    function drawBouncingBlocks() {
+      ctx.fillStyle = 'blue';
+      for (const block of bouncingBlocks) {
+        ctx.fillRect(block.x, block.y, block.size, block.size);
+      }
+    }
+
+    function detectCollision() {
+      for (const obstacle of obstacles) {
+        if (
+          player.x < obstacle.x + obstacle.size &&
+          player.x + player.size > obstacle.x &&
+          player.y < obstacle.y + obstacle.size &&
+          player.y + player.size > obstacle.y
+        ) {
+          gameRunning = false;
+        }
+      }
+
+      for (const block of bouncingBlocks) {
+        if (
+          player.x < block.x + block.size &&
+          player.x + player.size > block.x &&
+          player.y < block.y + block.size &&
+          player.y + player.size > block.y
+        ) {
+          gameRunning = false;
+        }
+      }
+    }
+
+    function updateScore() {
+      document.getElementById('score').innerText = `Score: ${score}`;
+    }
+
+    function updateLevel() {
+      document.getElementById('level').innerText = `Level: ${level}`;
+    }
+
+    function updateTimer() {
+      document.getElementById('timer').innerText = `Time Left: ${timeLeft}`;
+    }
+
+    function advanceLevel() {
+      level++;
+      createBouncingBlock();
+      obstacles = []; // Clear obstacles at level up
+      frameCount = 0;
+      timeLeft = 30; // Reset timer
+    }
+
+    function countdownTimer() {
+      if (timeLeft > 0) {
+        timeLeft--;
+      } else {
+        gameRunning = false;
+      }
+    }
+
+    function gameLoop() {
+      if (!gameRunning) {
+        alert(`Game Over! Final Score: ${score}, Reached Level: ${level}`);
+        document.location.reload();
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawPlayer();
+      drawObstacles();
+      drawBouncingBlocks();
+
+      updateObstacles();
+      updateBouncingBlocks();
+      detectCollision();
+      updateScore();
+      updateLevel();
+      updateTimer();
+
+      frameCount++;
+      if (frameCount > levelDuration) {
+        advanceLevel();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowUp':
+          if (player.y > 0) player.y -= player.speed;
+          break;
+        case 'ArrowDown':
+          if (player.y < canvas.height - player.size) player.y += player.speed;
+          break;
+        case 'ArrowLeft':
+          if (player.x > 0) player.x -= player.speed;
+          break;
+        case 'ArrowRight':
+          if (player.x < canvas.width - player.size) player.x += player.speed;
+          break;
+      }
+    });
+
+    // Initialize game
+    createBouncingBlock();
+    setInterval(countdownTimer, 1000); // Start countdown timer
+    gameLoop();
+  </script>
+</body>
+</html>
